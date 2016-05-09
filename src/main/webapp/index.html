@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+    <!--References: http://bl.ocks.org/mbostock/4062045-->
+    <head>
+        <meta charset="utf-8">
+        <title>Hull Number</title>
+        <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+        <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+        <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-resource.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-route.min.js"></script>
+
+        <style>
+            .node {
+                fill: #000;
+                cursor: crosshair;
+            }
+
+            .node_selected {
+                fill: #ff7f0e;
+                stroke: #ff7f0e;
+            }
+
+            .drag_line {
+                stroke: #999;
+                stroke-width: 5;
+                pointer-events: none;
+            }
+
+            .drag_line_hidden {
+                stroke: #999;
+                stroke-width: 0;
+                pointer-events: none;
+            }
+
+            .link {
+                stroke: #999;
+                stroke-width: 5;
+                cursor: crosshair;
+            }
+
+            .link_selected {
+                stroke: #ff7f0e;
+            }
+
+        </style>
+    </head>
+    <body>
+        <div class="jumbotron">
+            <div class="container">
+                <h1>Hull Number</h1>
+            </div>
+        </div>
+
+        <div class="container"
+             ng-app="appHullNumber" 
+             ng-controller="hullNumberController">
+            <div class="row">
+                <form class="col-md-2">
+                    <fieldset>
+                        <legend>Graph</legend>
+                        <div class="form-group">
+                            <label for="nvertices">Vertex count</label>
+                            <input type="text" class="form-control" 
+                                   id="nvertices"
+                                   ng-model="nvertices"
+                                   name="nvertices" autofocus required>
+                        </div>
+                        <div class="form-group">
+                            <label for="grau-vertice">Vertex degree</label>
+                            <input type="number"
+                                   class="form-control"
+                                   ng-model="minDegree"
+                                   id="minDegree" name="minDegree" 
+                                   placeholder="1">
+                            <input type="number" 
+                                   class="form-control"
+                                   ng-model="maxDegree"
+                                   id="maxDegree" name="maxDegree" 
+                                   placeholder="5">
+                        </div>
+                        <div class="checkbox">
+                            <label>
+                                <input type="checkbox" value="sim"                                        
+                                       disabled name="spam" checked>
+                                Connected
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div class="form-group">
+                        <label for="grafotxt">Generated graph</label>
+                        <textarea class="form-control" disabled readonly
+                                  ng-model="graph"
+                                  id="grafotxt" name="grafotxt" rows="5">
+                        </textarea>
+                    </div>
+
+                    <button ng-click="randomGraph();" 
+                            class="btn btn-primary btn-medium pull-right">
+                        <span class="glyphicon glyphicon-repeat"></span>
+                        Random graph
+                    </button>
+                </form>
+                <div class="col-md-8">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">
+                            <h2>Simple Graph</h2>
+                        </div>
+                        <div class="panel-body">
+                            <div id="grafo" class="form-group" style="height: 600px;">
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <script>
+            var app = angular.module('appHullNumber', []);
+            app.controller('hullNumberController', function ($scope, $http) {
+                $scope.nvertices = 25;
+                $scope.minDegree = 1;
+                $scope.maxDegree = 5;
+                $scope.graph = null;
+
+                $scope.randomGraph = function () {
+                    $http.get('rest/graph/random', {
+                        params: {
+                            nvertices: $scope.nvertices,
+                            minDegree: $scope.minDegree,
+                            maxDegree: $scope.maxDegree
+                        }
+                    }).success(function (graph) {
+                        $scope.graph = graph;
+                        var width = $("#grafo").width();
+                        var height = $("#grafo").height();
+                        $("#grafo").html('');
+
+                        var color = d3.scale.category20();
+                        var force = d3.layout.force()
+                                .charge(-120)
+                                .linkDistance(30)
+                                .size([width, height]);
+
+                        var svg = d3.select("#grafo")
+                                .append("svg")
+                                .attr("width", width)
+                                .attr("height", height);
+
+                        var vertex = graph.vertices.map(function (d) {
+                            return {"name": d, "group": 1};
+                        });
+
+                        var edges = graph.pairs.map(function (d) {
+                            return {"source": d[0], "target": d[1], "value": 2, "origin": d};
+                        });
+
+                        force.nodes(vertex).links(edges).start();
+
+                        var link = svg.selectAll(".link")
+                                .data(edges)
+                                .enter().append("line")
+                                .attr("class", "link")
+                                .style("stroke-width", function (d) {
+                                    return Math.sqrt(d.value);
+                                });
+
+                        var node = svg.selectAll(".node")
+                                .data(vertex)
+                                .enter().append("circle")
+                                .attr("class", "node")
+                                .attr("r", 5)
+                                .style("fill", function (d) {
+                                    return color(d.group);
+                                }).call(force.drag);
+
+                        node.append("title").text(function (d) {
+                            return d.name;
+                        });
+
+                        force.on("tick", function () {
+                            link.attr("x1", function (d) {
+                                return d.source.x;
+                            }).attr("y1", function (d) {
+                                return d.source.y;
+                            }).attr("x2", function (d) {
+                                return d.target.x;
+                            }).attr("y2", function (d) {
+                                return d.target.y;
+                            });
+                            node.attr("cx", function (d) {
+                                return d.x;
+                            }).attr("cy", function (d) {
+                                return d.y;
+                            });
+                        });
+
+                    });
+                };
+                $scope.randomGraph();
+            });
+        </script>
+    </body>
+</html>
