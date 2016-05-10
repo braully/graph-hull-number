@@ -5,9 +5,18 @@
  */
 package com.github.braully.graph.hn;
 
-import com.github.braully.graph.hn.UndirectedSparseGraphTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.deser.BeanDeserializer;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Produces;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -21,13 +30,16 @@ import javax.ws.rs.core.Response;
 @Path("graph")
 public class GraphWS {
 
+    private static final String PARAM_NAME_HULL_NUMBER = "number";
+    private static final String PARAM_NAME_HULL_SET = "set";
+
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Path("random")
-    public Response randomGraph(
-            @QueryParam("nvertices") Integer nvertices,
-            @QueryParam("minDegree") Integer minDegree,
-            @QueryParam("maxDegree") Integer maxDegree) {
+    public UndirectedSparseGraphTO randomGraph(
+            @QueryParam("nvertices") @DefaultValue("5") Integer nvertices,
+            @QueryParam("minDegree") @DefaultValue("1") Integer minDegree,
+            @QueryParam("maxDegree") @DefaultValue("1") Integer maxDegree) {
         UndirectedSparseGraphTO<Integer, Integer> graph = new UndirectedSparseGraphTO<Integer, Integer>();
         Integer[] v = new Integer[nvertices];
         for (int i = 0; i < nvertices; i++) {
@@ -42,6 +54,32 @@ public class GraphWS {
                 graph.addEdge(countEdge++, v[i], v[vrandom]);
             }
         }
-        return Response.ok(graph).build();
+        return graph;
+    }
+
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("hull")
+    public Map<String, Object> calcHullNumberGraph(String jsonGraph) {
+        Integer hullNumber = null;
+        Integer[] hullSet = null;
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            BeanDeserializer bd = null;
+            UndirectedSparseGraphTO<Integer, Integer> readValue = mapper.readValue(jsonGraph, UndirectedSparseGraphTO.class);
+        } catch (IOException ex) {
+            Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        /* Processar a buscar pelo hullset e hullnumber */
+        hullNumber = 0;
+        hullSet = new Integer[]{0, 1, 2};
+        Map<String, Object> response = new HashMap<>();
+        response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
+        response.put(PARAM_NAME_HULL_SET, hullSet);
+
+        return response;
     }
 }
