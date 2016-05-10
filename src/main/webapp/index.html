@@ -45,6 +45,10 @@
                 stroke: #ff7f0e;
             }
 
+            .node title, .node text {
+                pointer-events: none;
+                font: 10px sans-serif;
+            }
         </style>
     </head>
     <body>
@@ -64,20 +68,20 @@
                         <div class="form-group">
                             <label for="nvertices">Vertex count</label>
                             <input type="text" class="form-control" 
-                                   id="nvertices"
+                                   id="nvertices"  min="1"
                                    ng-model="nvertices"
                                    name="nvertices" autofocus required>
                         </div>
                         <div class="form-group">
-                            <label for="minDegree">Vertex degree</label>
+                            <label for="minDegree">Vertex degree (suggestion)</label>
                             <input type="number"
                                    class="form-control"
-                                   ng-model="minDegree"
+                                   ng-model="minDegree" min="1"
                                    id="minDegree" name="minDegree" 
                                    placeholder="1">
                             <input type="number" 
                                    class="form-control"
-                                   ng-model="maxDegree"
+                                   ng-model="maxDegree" min="2"
                                    id="maxDegree" name="maxDegree" 
                                    placeholder="5">
                         </div>
@@ -180,7 +184,7 @@
                         var color = d3.scale.category20();
                         var force = d3.layout.force()
                                 .charge(-120)
-                                .linkDistance(30)
+                                .linkDistance(70)
                                 .size([width, height]);
 
                         var svg = d3.select("#grafo")
@@ -206,18 +210,26 @@
                                     return Math.sqrt(d.value);
                                 });
 
-                        var node = svg.selectAll(".node")
+                        var nodes = svg.selectAll(".node")
                                 .data(vertex)
-                                .enter().append("circle")
+                                .enter().append("g")
+                                .attr("class", "node")
+                                .call(force.drag);
+
+                        nodes.append("circle")
                                 .attr("class", "node")
                                 .attr("r", 5)
+//                                .attr("x", -8)
+//                                .attr("y", -8)
                                 .style("fill", function (d) {
                                     return color(d.group);
                                 }).call(force.drag);
 
-                        node.append("title").text(function (d) {
-                            return d.name;
-                        });
+                        nodes.append("text").attr("dx", 6)
+                                .attr("dy", ".35em")
+                                .text(function (d) {
+                                    return d.name;
+                                });
 
                         force.on("tick", function () {
                             link.attr("x1", function (d) {
@@ -229,7 +241,9 @@
                             }).attr("y2", function (d) {
                                 return d.target.y;
                             });
-                            node.attr("cx", function (d) {
+                            nodes.attr("transform", function (d) {
+                                return "translate(" + d.x + "," + d.y + ")";
+                            }).attr("cx", function (d) {
                                 return d.x;
                             }).attr("cy", function (d) {
                                 return d.y;
