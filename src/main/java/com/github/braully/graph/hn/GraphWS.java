@@ -9,9 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializer;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.ws.rs.Consumes;
@@ -22,6 +26,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.math3.util.CombinatoricsUtils;
 
 /**
  * REST Web Service
@@ -33,6 +38,8 @@ public class GraphWS {
 
     private static final String PARAM_NAME_HULL_NUMBER = "number";
     private static final String PARAM_NAME_HULL_SET = "set";
+    private int INCLUDED = 2;
+    private int NEIGHBOOR_COUNT_INCLUDED = 1;
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -51,20 +58,23 @@ public class GraphWS {
     @Consumes(MediaType.APPLICATION_JSON)
     @Path("hull")
     public Map<String, Object> calcHullNumberGraph(String jsonGraph) {
-        Integer hullNumber = null;
+        Integer hullNumber = -1;
         Integer[] hullSet = null;
 
         try {
             ObjectMapper mapper = new ObjectMapper();
             BeanDeserializer bd = null;
             UndirectedSparseGraphTO<Integer, Integer> readValue = mapper.readValue(jsonGraph, UndirectedSparseGraphTO.class);
+            Set<Integer> minHullSet = calcMinHullNumberGraph(readValue);
+            if (minHullSet != null && !minHullSet.isEmpty()) {
+                hullNumber = minHullSet.size();
+                hullSet = minHullSet.toArray(new Integer[0]);
+            }
         } catch (IOException ex) {
             Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
         }
 
         /* Processar a buscar pelo hullset e hullnumber */
-        hullNumber = 0;
-        hullSet = new Integer[]{0, 1, 2};
         Map<String, Object> response = new HashMap<>();
         response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
         response.put(PARAM_NAME_HULL_SET, hullSet);
@@ -137,5 +147,88 @@ public class GraphWS {
             }
         }
         return graph;
+    }
+
+    private Set<Integer> calcMinHullNumberGraph(UndirectedSparseGraphTO<Integer, Integer> graph) {
+        Set<Integer> ceilling = calcCeillingHullNumberGraph(graph);
+        Set<Integer> hullSet = ceilling;
+        if (graph == null || graph.getVertices().isEmpty()) {
+            return ceilling;
+        }
+        int maxSizeSet = ceilling.size();
+        int currentSize = 1;
+        Collection<Integer> vertices = graph.getVertices();
+        while (currentSize < maxSizeSet) {
+            Set<Integer> hs = findHullSetBruteForce(graph, currentSize);
+            if (hs != null && !hs.isEmpty()) {
+                hullSet = hs;
+                break;
+            }
+            currentSize++;
+        }
+        return hullSet;
+    }
+
+    private Set<Integer> calcCeillingHullNumberGraph(UndirectedSparseGraphTO<Integer, Integer> graph) {
+        Set<Integer> ceilling = new HashSet<>();
+        if (graph != null) {
+            Collection vertices = graph.getVertices();
+            if (vertices != null) {
+                ceilling.addAll(vertices);
+            }
+        }
+        return ceilling;
+    }
+
+    public Set<Integer> findHullSetBruteForce(UndirectedSparseGraphTO<Integer, Integer> graph, int currentSetSize) {
+        Set<Integer> hullSet = null;
+        if (graph == null || graph.getVertexCount() <= 0) {
+            return hullSet;
+        }
+        Collection vertices = graph.getVertices();
+        Iterator<int[]> combinationsIterator = CombinatoricsUtils.combinationsIterator(graph.getVertexCount(), currentSetSize);
+        while (combinationsIterator.hasNext()) {
+            int[] currentSet = combinationsIterator.next();
+            if (checkIfHullSet(graph, currentSet)) {
+                hullSet = new HashSet<>(currentSetSize);
+                for (int i : currentSet) {
+                    hullSet.add(i);
+                }
+                break;
+            }
+        }
+        return hullSet;
+    }
+
+    public boolean checkIfHullSet(UndirectedSparseGraphTO<Integer, Integer> graph,
+            int[] currentSet) {
+        if (currentSet == null || currentSet.length == 0) {
+            return false;
+        }
+        Set<Integer> fecho = new HashSet<>();
+        Collection vertices = graph.getVertices();
+        int[] aux = new int[graph.getVertexCount()];
+        for (int i = 0; i < aux.length; i++) {
+            aux[i] = 0;
+        }
+        for (int i : currentSet) {
+            includeVertex(graph, fecho, aux, i);
+        }
+        return fecho.size() == graph.getVertexCount();
+    }
+
+    public void includeVertex(UndirectedSparseGraphTO<Integer, Integer> graph, Set<Integer> fecho, int[] aux, int i) {
+        fecho.add(i);
+        aux[i] = INCLUDED;
+        Collection<Integer> neighbors = graph.getNeighbors(i);
+        for (int vert : neighbors) {
+            if (vert != i) {
+                int previousValue = aux[vert];
+                aux[vert] = aux[vert] + NEIGHBOOR_COUNT_INCLUDED;
+                if (previousValue < INCLUDED && aux[vert] >= INCLUDED) {
+                    includeVertex(graph, fecho, aux, vert);
+                }
+            }
+        }
     }
 }
