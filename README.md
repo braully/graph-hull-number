@@ -4,6 +4,8 @@
 
 AngularJS: https://angularjs.org/
 
+Apache Commons-Math: http://commons.apache.org/proper/commons-math/
+
 Jersey: https://jersey.java.net/
 
 Java Universal Network/Graph Framework: http://jung.sourceforge.net/
