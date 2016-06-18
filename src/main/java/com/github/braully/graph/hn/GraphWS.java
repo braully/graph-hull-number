@@ -189,7 +189,16 @@ public class GraphWS {
     private Set<Integer> calcCeillingHullNumberGraph(UndirectedSparseGraphTO<Integer, Integer> graph) {
         Set<Integer> ceilling = new HashSet<>();
         if (graph != null) {
-            Collection vertices = graph.getVertices();
+            Collection<Integer> vertices = graph.getVertices();
+//            int[] aux = new int[graph.getVertexCount()];
+//            for (Integer i : vertices) {
+//                int degree = graph.degree(i);
+//                aux[i] = degree;
+//                if (degree == 1) {
+//                    ceilling.add(i);
+//                }
+//            }
+
             if (vertices != null) {
                 ceilling.addAll(vertices);
             }
