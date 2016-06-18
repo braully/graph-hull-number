@@ -13,6 +13,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -115,9 +118,23 @@ public class GraphWS {
             degree[i] = 0;
             graph.addVertex(vertexs[i]);
         }
+
         int countEdge = 0;
         int offset = maxDegree - minDegree;
 //        Integer lastVertexTarget = null;
+
+        List<Integer> connected = new ArrayList<>();
+        connected.add(vertexs[0]);
+        for (int i = 1; i < nvertices; i++) {
+            int vrandom = (int) Math.round(Math.random() * (connected.size() - 1));
+            Integer target = connected.get(vrandom);
+            Integer source = vertexs[i];
+            graph.addEdge(countEdge++, source, target);
+            connected.add(vertexs[i]);
+            degree[target]++;
+            degree[source]++;
+        }
+
         for (int i = nvertices - 1; i > 0; i--) {
             long limite = minDegree + Math.round(Math.random() * (offset));
             int size = vertexElegibles.size();
