@@ -8,13 +8,16 @@ package com.github.braully.graph.hn;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializer;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -220,9 +223,31 @@ public class GraphWS {
         for (int i = 0; i < aux.length; i++) {
             aux[i] = 0;
         }
-        for (int i : currentSet) {
-            includeVertex(graph, fecho, aux, i);
+
+        Queue<Integer> mustBeIncluded = new ArrayDeque<>();
+        for (Integer v : currentSet) {
+            mustBeIncluded.add(v);
         }
+        while (!mustBeIncluded.isEmpty()) {
+            Integer verti = mustBeIncluded.remove();
+            fecho.add(verti);
+            aux[verti] = INCLUDED;
+            Collection<Integer> neighbors = graph.getNeighbors(verti);
+            for (int vertn : neighbors) {
+                if (vertn != verti) {
+                    int previousValue = aux[vertn];
+                    aux[vertn] = aux[vertn] + NEIGHBOOR_COUNT_INCLUDED;
+                    if (previousValue < INCLUDED && aux[vertn] >= INCLUDED) {
+//                        includeVertex(graph, fecho, aux, verti);
+                        mustBeIncluded.add(vertn);
+                    }
+                }
+            }
+        }
+
+//        for (int i : currentSet) {
+//            includeVertex(graph, fecho, aux, i);
+//        }
         return fecho.size() == graph.getVertexCount();
     }
 
