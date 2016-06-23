@@ -7,6 +7,8 @@ package com.github.braully.graph.hn;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializer;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -14,7 +16,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -78,6 +79,32 @@ public class GraphWS {
         }
 
         /* Processar a buscar pelo hullset e hullnumber */
+        Map<String, Object> response = new HashMap<>();
+        response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
+        response.put(PARAM_NAME_HULL_SET, hullSet);
+
+        return response;
+    }
+
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Path("hullparallel")
+    public Map<String, Object> calcHullNumberGraphParallel(String jsonGraph) {
+        Integer hullNumber = -1;
+        Integer[] hullSet = null;
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            BeanDeserializer bd = null;
+            UndirectedSparseGraphTO<Integer, Integer> undGraph = mapper.readValue(jsonGraph, UndirectedSparseGraphTO.class);
+
+            String path = saveTmpFileGraphInCsr(undGraph);
+
+        } catch (IOException ex) {
+            Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
         response.put(PARAM_NAME_HULL_SET, hullSet);
@@ -264,5 +291,54 @@ public class GraphWS {
                 }
             }
         }
+    }
+
+    private String saveTmpFileGraphInCsr(UndirectedSparseGraphTO<Integer, Integer> undGraph) {
+        String strFile = null;
+        if (undGraph != null && undGraph.getVertexCount() > 0) {
+            try {
+                int vertexCount = undGraph.getVertexCount();
+                File file = File.createTempFile("graph-csr-", ".txt");
+                file.deleteOnExit();
+
+                strFile = file.getAbsolutePath();
+                FileWriter writer = new FileWriter(file);
+                writer.write("#Graph |V| = " + vertexCount + "\n");
+
+                int sizeRowOffset = 0;
+                List<Integer> csrColIdxs = new ArrayList<>();
+                List<Integer> rowOffset = new ArrayList<>();
+
+                int idx = 0;
+                for (Integer i = 0; i < vertexCount; i++) {
+                    csrColIdxs.add(idx);
+                    Collection<Integer> neighbors = undGraph.getNeighbors(i);
+                    Set<Integer> neighSet = new HashSet<>();
+                    neighSet.addAll(neighbors);
+                    for (Integer vn : neighSet) {
+                        if (!vn.equals(i)) {
+                            rowOffset.add(vn);
+                            idx++;
+                        }
+                    }
+                }
+
+                for (Integer i : csrColIdxs) {
+                    writer.write("" + i);
+                    writer.write(" ");
+                }
+                writer.write("\n");
+                for (Integer i : rowOffset) {
+                    writer.write("" + i);
+                    writer.write(" ");
+                }
+                writer.write("\n");
+                writer.close();
+            } catch (IOException ex) {
+                Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        Logger.getLogger(GraphWS.class.getName()).log(Level.INFO, "File tmp graph: " + strFile);
+        return strFile;
     }
 }
