@@ -132,7 +132,12 @@
                         <button ng-click="calcHullNumberGraph();" 
                                 class="btn btn-primary btn-medium pull-right">
                             <span class="glyphicon glyphicon-certificate"></span>
-                            Calc hull number
+                            Hull Nº
+                        </button>
+                        <button ng-click="calcHullNumberGraphParallel();" 
+                                class="btn btn-primary btn-medium pull-right">
+                            <span class="glyphicon glyphicon-certificate"></span>
+                            Hull Nº Parallel
                         </button>
                     </fieldset>
                 </form>
@@ -164,6 +169,12 @@
 
                 $scope.calcHullNumberGraph = function () {
                     $http.post('rest/graph/hull', $scope.graph).success(function (hulldata) {
+                        $scope.hull = hulldata;
+                    });
+                };
+
+                $scope.calcHullNumberGraphParallel = function () {
+                    $http.post('rest/graph/hullparallel', $scope.graph).success(function (hulldata) {
                         $scope.hull = hulldata;
                     });
                 };
