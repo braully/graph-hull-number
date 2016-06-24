@@ -129,11 +129,25 @@
                                    class="form-control"
                                    ng-model="hull.set" disabled readonly>
                         </div>
+                        <div class="form-group">
+                            <label>Serial time</label>
+                            <input type="text"
+                                   class="form-control"
+                                   ng-model="hull.serial" disabled readonly>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Parallel time</label>
+                            <input type="text"
+                                   class="form-control"
+                                   ng-model="hull.parallel" disabled readonly>
+                        </div>
                         <button ng-click="calcHullNumberGraph();" 
                                 class="btn btn-primary btn-medium pull-right">
                             <span class="glyphicon glyphicon-certificate"></span>
                             Hull Nº
                         </button>
+
                         <button ng-click="calcHullNumberGraphParallel();" 
                                 class="btn btn-primary btn-medium pull-right">
                             <span class="glyphicon glyphicon-certificate"></span>
@@ -165,7 +179,7 @@
                 $scope.maxDegree = 2;
                 $scope.graph = null;
 
-                $scope.hull = {number: [], set: []};
+                $scope.hull = {number: [], set: [], parallel: [], serial: []};
 
                 $scope.calcHullNumberGraph = function () {
                     $http.post('rest/graph/hull', $scope.graph).success(function (hulldata) {

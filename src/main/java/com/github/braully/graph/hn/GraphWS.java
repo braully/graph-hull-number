@@ -7,9 +7,11 @@ package com.github.braully.graph.hn;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializer;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,6 +24,8 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Produces;
@@ -40,10 +44,21 @@ import org.apache.commons.math3.util.CombinatoricsUtils;
 @Path("graph")
 public class GraphWS {
 
+    private static final Logger log = Logger.getLogger(GraphWS.class.getSimpleName());
+
     private static final String PARAM_NAME_HULL_NUMBER = "number";
     private static final String PARAM_NAME_HULL_SET = "set";
-    private int INCLUDED = 2;
-    private int NEIGHBOOR_COUNT_INCLUDED = 1;
+    private static final String PARAM_NAME_SERIAL_TIME = "serial";
+    private static final String PARAM_NAME_PARALLEL_TIME = "parallel";
+    private static final String COMMAND_GRAPH_HN = "/media/dados/Dropbox/documentos/mestrado/ppd-2016/graph-hull-number-parallel"
+            + "/dist/Debug/CUDA-Linux/graph-hull-number-parallel";
+    private final int INCLUDED = 2;
+    private final int NEIGHBOOR_COUNT_INCLUDED = 1;
+
+    private static final Pattern PATERN_HULL_SET = Pattern.compile(".*?Combination: \\{([0-9, ]+)\\}.*?");
+    private static final Pattern PATERN_HULL_NUMBER = Pattern.compile(".*?S\\| = ([0-9]+).*?");
+    private static final Pattern PATERN_SERIAL_TIME = Pattern.compile("Total time serial: (\\w+)");
+    private static final Pattern PATERN_PARALLEL_TIME = Pattern.compile("Total time parallel: (\\w+)");
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -52,7 +67,6 @@ public class GraphWS {
             @QueryParam("nvertices") @DefaultValue("5") Integer nvertices,
             @QueryParam("minDegree") @DefaultValue("1") Integer minDegree,
             @QueryParam("maxDegree") @DefaultValue("1") Integer maxDegree) {
-//        UndirectedSparseGraphTO<Integer, Integer> graph = generateRandomGraphSimple(nvertices, minDegree, maxDegree);
         UndirectedSparseGraphTO<Integer, Integer> graph = generateRandomGraph(nvertices, minDegree, maxDegree);
         return graph;
     }
@@ -75,14 +89,15 @@ public class GraphWS {
                 hullSet = minHullSet.toArray(new Integer[0]);
             }
         } catch (IOException ex) {
-            Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+            log.log(Level.SEVERE, null, ex);
         }
 
         /* Processar a buscar pelo hullset e hullnumber */
         Map<String, Object> response = new HashMap<>();
         response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
         response.put(PARAM_NAME_HULL_SET, hullSet);
-
+        response.put(PARAM_NAME_PARALLEL_TIME, "--");
+        response.put(PARAM_NAME_SERIAL_TIME, "--");
         return response;
     }
 
@@ -91,8 +106,10 @@ public class GraphWS {
     @Consumes(MediaType.APPLICATION_JSON)
     @Path("hullparallel")
     public Map<String, Object> calcHullNumberGraphParallel(String jsonGraph) {
-        Integer hullNumber = -1;
+        Integer hullNumber = null;
         Integer[] hullSet = null;
+        String pTime = null;
+        String sTime = null;
 
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -101,14 +118,49 @@ public class GraphWS {
 
             String path = saveTmpFileGraphInCsr(undGraph);
 
+            String commandToExecute = COMMAND_GRAPH_HN + " -sp " + path;
+
+            log.log(Level.INFO, "Command: {0}", commandToExecute);
+            log.log(Level.INFO, "Executing");
+            Process p = Runtime.getRuntime().exec(commandToExecute);
+            p.waitFor();
+            log.log(Level.INFO, "Executed");
+            BufferedReader reader
+                    = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            String line = "";
+            log.log(Level.INFO, "Output");
+            while ((line = reader.readLine()) != null) {
+                log.log(Level.INFO, line);
+                try {
+                    if (hullSet == null) {
+                        hullSet = parseHullSet(line);
+                    }
+                    if (hullNumber == null) {
+                        hullNumber = parseHullNumber(line);
+                    }
+                    if (pTime == null) {
+                        pTime = parseParallelTime(line);
+                    }
+                    if (sTime == null) {
+                        sTime = parseSerialTime(line);
+                    }
+                } catch (Exception e) {
+                    log.log(Level.WARNING, "", e);
+                }
+            }
+
         } catch (IOException ex) {
-            Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+            log.log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            log.log(Level.SEVERE, null, ex);
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put(PARAM_NAME_HULL_NUMBER, hullNumber);
         response.put(PARAM_NAME_HULL_SET, hullSet);
-
+        response.put(PARAM_NAME_PARALLEL_TIME, pTime);
+        response.put(PARAM_NAME_SERIAL_TIME, sTime);
         return response;
     }
 
@@ -162,32 +214,34 @@ public class GraphWS {
             degree[source]++;
         }
 
-        for (int i = nvertices - 1; i > 0; i--) {
-            long limite = minDegree + Math.round(Math.random() * (offset));
-            int size = vertexElegibles.size();
-            Integer source = vertexs[i];
-            for (int j = 0; j <= limite; j++) {
-                //Exclude last element from choose (no loop)
-                Integer target = null;
-                if (vertexElegibles.size() > 1) {
-                    int vrandom = (int) Math.round(Math.random() * (size - 2));
-                    target = vertexElegibles.get(vrandom);
-                    if (graph.addEdge(countEdge++, source, target)) {
-                        if (degree[target]++ >= maxDegree) {
-                            vertexElegibles.remove(target);
+        if (offset > 1) {
+            for (int i = nvertices - 1; i > 0; i--) {
+                long limite = minDegree + Math.round(Math.random() * (offset));
+                int size = vertexElegibles.size();
+                Integer source = vertexs[i];
+                for (int j = 0; j <= limite; j++) {
+                    //Exclude last element from choose (no loop)
+                    Integer target = null;
+                    if (vertexElegibles.size() > 1) {
+                        int vrandom = (int) Math.round(Math.random() * (size - 2));
+                        target = vertexElegibles.get(vrandom);
+                        if (graph.addEdge(countEdge++, source, target)) {
+                            if (degree[target]++ >= maxDegree) {
+                                vertexElegibles.remove(target);
+                            }
+                            if (degree[source]++ >= maxDegree) {
+                                vertexElegibles.remove(source);
+                            }
                         }
-                        if (degree[source]++ >= maxDegree) {
-                            vertexElegibles.remove(source);
-                        }
+                        size = vertexElegibles.size();
+                    } else {
+                        int vrandom = (int) Math.round(Math.random() * (nvertices - 1));
+                        target = vertexs[vrandom];
+                        graph.addEdge(countEdge++, source, target);
                     }
-                    size = vertexElegibles.size();
-                } else {
-                    int vrandom = (int) Math.round(Math.random() * (nvertices - 1));
-                    target = vertexs[vrandom];
-                    graph.addEdge(countEdge++, source, target);
-                }
 //                lastVertexTarget = target;
 
+                }
             }
         }
         return graph;
@@ -336,6 +390,7 @@ public class GraphWS {
                         }
                     }
                 }
+                csrColIdxs.add(idx);
 
                 for (Integer i : csrColIdxs) {
                     writer.write("" + i);
@@ -349,10 +404,58 @@ public class GraphWS {
                 writer.write("\n");
                 writer.close();
             } catch (IOException ex) {
-                Logger.getLogger(GraphWS.class.getName()).log(Level.SEVERE, null, ex);
+                log.log(Level.SEVERE, null, ex);
             }
         }
-        Logger.getLogger(GraphWS.class.getName()).log(Level.INFO, "File tmp graph: " + strFile);
+        log.log(Level.INFO, "File tmp graph: {0}", strFile);
         return strFile;
+    }
+
+    private Integer[] parseHullSet(String line) {
+        Integer[] ret = null;
+        Matcher m = PATERN_HULL_SET.matcher(line);
+        if (m.find()) {
+            String[] split = m.group(1).split(",");
+            if (split != null && split.length > 0) {
+                ret = new Integer[split.length];
+                for (int i = 0; i < split.length; i++) {
+                    String st = split[i];
+                    ret[i] = Integer.parseInt(st.trim());
+                }
+            }
+        }
+        return ret;
+    }
+
+    private Integer parseHullNumber(String line) {
+        Integer ret = null;
+        Matcher m = PATERN_HULL_NUMBER.matcher(line);
+        if (m.find()) {
+            String trim = m.group();
+            trim = m.group(1);
+//            String trim = m.group();
+            if (trim != null && !trim.isEmpty()) {
+                ret = Integer.parseInt(trim.trim());
+            }
+        }
+        return ret;
+    }
+
+    private String parseParallelTime(String line) {
+        String ret = null;
+        Matcher m = PATERN_PARALLEL_TIME.matcher(line);
+        if (m.find()) {
+            ret = m.group(1);
+        }
+        return ret;
+    }
+
+    private String parseSerialTime(String line) {
+        String ret = null;
+        Matcher m = PATERN_SERIAL_TIME.matcher(line);
+        if (m.find()) {
+            ret = m.group(1);
+        }
+        return ret;
     }
 }
