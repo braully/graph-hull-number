@@ -103,8 +103,8 @@ public class CombintionTest extends TestCase {
     }
 
     public void testCombinadic() {
-        Combination c = new Combination(5, 3);
-        Combination Element = c.Element(4);
-        System.err.println("C4(5,3): " + Element);
+        Combination c = new Combination(25, 14);
+        Combination Element = c.Element(1000);
+        System.err.println("C100(25, 14): " + Element);
     }
 }
