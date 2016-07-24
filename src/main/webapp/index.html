@@ -67,7 +67,7 @@
                         <legend>Graph</legend>
                         <div class="form-group">
                             <label for="nvertices">Vertex count</label>
-                            <input type="text" class="form-control" 
+                            <input type="number" class="form-control" 
                                    id="nvertices"  min="1"
                                    ng-model="nvertices"
                                    name="nvertices" autofocus required>
@@ -79,9 +79,9 @@
                                    ng-model="minDegree" min="1"
                                    id="minDegree" name="minDegree" 
                                    placeholder="1">
-                            <input type="number" 
+                            <input type="text" 
                                    class="form-control"
-                                   ng-model="maxDegree" min="2"
+                                   ng-model="maxDegree" min="2.0"
                                    id="maxDegree" name="maxDegree" 
                                    placeholder="5">
                         </div>
@@ -176,7 +176,7 @@
             app.controller('hullNumberController', function ($scope, $http) {
                 $scope.nvertices = 5;
                 $scope.minDegree = 1;
-                $scope.maxDegree = 2;
+                $scope.maxDegree = 2.0;
                 $scope.graph = null;
 
                 $scope.hull = {number: [], set: [], parallel: [], serial: []};

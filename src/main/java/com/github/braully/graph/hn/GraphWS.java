@@ -50,8 +50,7 @@ public class GraphWS {
     private static final String PARAM_NAME_HULL_SET = "set";
     private static final String PARAM_NAME_SERIAL_TIME = "serial";
     private static final String PARAM_NAME_PARALLEL_TIME = "parallel";
-    private static final String COMMAND_GRAPH_HN = "/media/dados/Dropbox/documentos/mestrado/ppd-2016/graph-hull-number-parallel"
-            + "/dist/Debug/CUDA-Linux/graph-hull-number-parallel";
+    private static final String COMMAND_GRAPH_HN = "/home/strike/Workspace/pesquisa/graph-hull-number-parallel/graph-test/";
     private final int INCLUDED = 2;
     private final int NEIGHBOOR_COUNT_INCLUDED = 1;
 
@@ -66,7 +65,7 @@ public class GraphWS {
     public UndirectedSparseGraphTO randomGraph(
             @QueryParam("nvertices") @DefaultValue("5") Integer nvertices,
             @QueryParam("minDegree") @DefaultValue("1") Integer minDegree,
-            @QueryParam("maxDegree") @DefaultValue("1") Integer maxDegree) {
+            @QueryParam("maxDegree") @DefaultValue("1") Double maxDegree) {
         UndirectedSparseGraphTO<Integer, Integer> graph = generateRandomGraph(nvertices, minDegree, maxDegree);
         return graph;
     }
@@ -186,7 +185,7 @@ public class GraphWS {
 
     private UndirectedSparseGraphTO<Integer, Integer> generateRandomGraph(Integer nvertices,
             Integer minDegree,
-            Integer maxDegree) {
+            Double maxDegree) {
         UndirectedSparseGraphTO<Integer, Integer> graph = new UndirectedSparseGraphTO<Integer, Integer>();
         List<Integer> vertexElegibles = new ArrayList<>(nvertices);
         Integer[] vertexs = new Integer[nvertices];
@@ -197,9 +196,10 @@ public class GraphWS {
             degree[i] = 0;
             graph.addVertex(vertexs[i]);
         }
+        long extimatedEdge = nvertices * minDegree + Math.round(nvertices * (maxDegree - minDegree));
 
         int countEdge = 0;
-        int offset = maxDegree - minDegree - 1;
+        Double offset = maxDegree - minDegree - 1;
 //        Integer lastVertexTarget = null;
 
         List<Integer> connected = new ArrayList<>();
@@ -216,14 +216,14 @@ public class GraphWS {
 
         if (offset > 1) {
             for (int i = nvertices - 1; i > 0; i--) {
-                long limite = minDegree + Math.round(Math.random() * (offset));
+                long limite = minDegree + Math.round(Math.random() * offset);
                 int size = vertexElegibles.size();
                 Integer source = vertexs[i];
                 for (int j = 0; j <= limite; j++) {
                     //Exclude last element from choose (no loop)
                     Integer target = null;
                     if (vertexElegibles.size() > 1) {
-                        int vrandom = (int) Math.round(Math.random() * (size - 2));
+                        int vrandom = (int) Math.round(Math.random() * (size - 1));
                         target = vertexElegibles.get(vrandom);
                         if (graph.addEdge(countEdge++, source, target)) {
                             if (degree[target]++ >= maxDegree) {
@@ -237,11 +237,22 @@ public class GraphWS {
                     } else {
                         int vrandom = (int) Math.round(Math.random() * (nvertices - 1));
                         target = vertexs[vrandom];
-                        graph.addEdge(countEdge++, source, target);
+                        if (graph.addEdge(countEdge++, source, target)) {
+
+                        }
                     }
 //                lastVertexTarget = target;
 
                 }
+            }
+        }
+
+        int edgeCount = graph.getEdgeCount();
+
+        if (edgeCount < extimatedEdge) {
+            for (int i = 0; i < extimatedEdge - edgeCount; i++) {
+                int vrandom = (int) Math.round(Math.random() * (nvertices - 1));
+                while (!graph.addEdge(countEdge++, vrandom, (int) Math.round(Math.random() * (nvertices - 1))));
             }
         }
         return graph;
@@ -366,8 +377,9 @@ public class GraphWS {
         if (undGraph != null && undGraph.getVertexCount() > 0) {
             try {
                 int vertexCount = undGraph.getVertexCount();
-                File file = File.createTempFile("graph-csr-", ".txt");
-                file.deleteOnExit();
+                int edegeCount = undGraph.getEdgeCount();
+                File file = new File(COMMAND_GRAPH_HN + "graph-csr-" + vertexCount + "-" + edegeCount + ".txt");
+//                file.deleteOnExit();
 
                 strFile = file.getAbsolutePath();
                 FileWriter writer = new FileWriter(file);
